@@ -3,7 +3,7 @@ import { useContext, useEffect, useState } from "react";
 import { UserContext } from "../../Context/UserContext";
 import axios from "axios";
 
-export default function AddWorkout(){
+export default function AddWorkout() {
 
     const { user } = useContext(UserContext);
 
@@ -25,16 +25,30 @@ export default function AddWorkout(){
     const [workoutDay, setWorkoutDay] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState(false);
 
     useEffect(() => {
 
-        if (!user || !user.email || !selectedDate) {
+        // Handle a missing logged-in user.
+        if (!user || !user.email) {
+            setLoading(false);
+            setError(false);
+            setWorkoutDay(null);
+            return;
+        }
+
+        // Handle an empty date.
+        if (!selectedDate) {
+            setLoading(false);
+            setError(false);
+            setWorkoutDay(null);
             return;
         }
 
         let ignore = false;
 
-        async function fetchWorkoutDay(){
+        async function fetchWorkoutDay() {
 
             setLoading(true);
             setError(false);
@@ -47,6 +61,9 @@ export default function AddWorkout(){
                     {
                         user_email: user.email,
                         date: selectedDate
+                    },
+                    {
+                        timeout: 5000
                     }
                 );
 
@@ -54,9 +71,12 @@ export default function AddWorkout(){
                     setWorkoutDay(response.data);
                 }
 
-            } catch (error) {
+            } catch (requestError) {
 
-                console.error("Failed to fetch workout day:", error);
+                console.error(
+                    "Failed to fetch workout day:",
+                    requestError
+                );
 
                 if (!ignore) {
                     setError(true);
@@ -86,28 +106,157 @@ export default function AddWorkout(){
         workoutDay.exercises &&
         Object.keys(workoutDay.exercises).length > 0;
 
-    return(
+    async function handleSubmit(event) {
+
+        event.preventDefault();
+
+        setSaveError(false);
+
+        if (!user || !user.email) {
+            setSaveError(true);
+            return;
+        }
+
+        if (!selectedDate) {
+            setSaveError(true);
+            return;
+        }
+
+        if (!exerciseName.trim()) {
+            setSaveError(true);
+            return;
+        }
+
+        const repsNumber = Number(reps);
+        const weightNumber = Number(weight);
+
+        if (
+            !Number.isInteger(repsNumber) ||
+            repsNumber < 1 ||
+            !Number.isFinite(weightNumber) ||
+            weightNumber < 0
+        ) {
+            setSaveError(true);
+            return;
+        }
+
+        setSaving(true);
+
+        try {
+
+            await axios.post(
+                "http://localhost:8001/workouts/add_exercise",
+                {
+                    user_email: user.email,
+                    date: selectedDate,
+                    exercise_name: exerciseName.trim(),
+                    reps: repsNumber,
+                    weight: weightNumber
+                },
+                {
+                    timeout: 5000
+                }
+            );
+
+            setExerciseName("");
+            setReps("");
+            setWeight("");
+
+            // Refresh the Workout Summary.
+            // Changing the date would also trigger the effect,
+            // but we want to refresh the same selected date.
+            setWorkoutDay(null);
+            setLoading(true);
+            setError(false);
+
+            const response = await axios.post(
+                "http://localhost:8001/workouts/workout_day",
+                {
+                    user_email: user.email,
+                    date: selectedDate
+                },
+                {
+                    timeout: 5000
+                }
+            );
+
+            setWorkoutDay(response.data);
+            setLoading(false);
+
+        } catch (requestError) {
+
+            console.error(
+                "Failed to save workout:",
+                requestError
+            );
+
+            setSaveError(true);
+
+        } finally {
+
+            setSaving(false);
+
+        }
+    }
+
+    return (
         <div className="workout-tracker-wrapper">
 
             <div className="workout-summary-container">
 
                 <h2>Workout Summary</h2>
 
-                {loading && (
+                {!user || !user.email ? (
+                    <p>Please log in</p>
+                ) : !selectedDate ? (
+                    <p>Select a date</p>
+                ) : loading ? (
                     <p>Loading workout...</p>
-                )}
-
-                {!loading && error && (
-                    <p>Couldn't load this workout. Please check the server and try again.</p>
-                )}
-
-                {!loading && !error && workoutDay && !hasExercises && (
+                ) : error ? (
+                    <p>
+                        Couldn't load this workout. Please check the
+                        server and try again.
+                    </p>
+                ) : !hasExercises ? (
                     <p>No exercises logged for this day</p>
+                ) : (
+                    <div className="workout-exercises">
+
+                        {Object.entries(workoutDay.exercises).map(
+                            ([exercise, sets]) => (
+                                <div
+                                    className="workout-exercise"
+                                    key={exercise}
+                                >
+
+                                    <h3>{exercise}</h3>
+
+                                    <ul
+                                        style={{
+                                            listStyle: "none",
+                                            padding: 0,
+                                            margin: 0
+                                        }}
+                                    >
+                                        {sets.map((set, index) => (
+                                            <li
+                                                key={`${exercise}-${index}`}
+                                            >
+                                                Set {index + 1}: {set.reps} reps × {set.weight} kg
+                                            </li>
+                                        ))}
+                                    </ul>
+
+                                </div>
+                            )
+                        )}
+
+                    </div>
                 )}
 
             </div>
 
-            <form className="workout-form">
+            <form className="workout-form" onSubmit={handleSubmit}>
 
                 <h2>New Set</h2>
 
@@ -162,10 +311,15 @@ export default function AddWorkout(){
                     placeholder="e.g. 60"
                 />
 
-                <button type="submit">
-                    Add Set
+                <button type="submit" disabled={saving}>
+                    {saving ? "Saving..." : "Add Set"}
                 </button>
 
+                {saveError && (
+                    <p>
+                        Couldn't save this set. Please check your details and try again.
+                    </p>
+                )}
             </form>
 
         </div>
