@@ -28,7 +28,19 @@ export default function AddWorkout(){
 
     useEffect(() => {
 
-        if (!user || !user.email || !selectedDate) {
+        // Handle a missing logged-in user.
+        if (!user || !user.email) {
+            setLoading(false);
+            setError(false);
+            setWorkoutDay(null);
+            return;
+        }
+
+        // Handle an empty date.
+        if (!selectedDate) {
+            setLoading(false);
+            setError(false);
+            setWorkoutDay(null);
             return;
         }
 
@@ -47,6 +59,9 @@ export default function AddWorkout(){
                     {
                         user_email: user.email,
                         date: selectedDate
+                    },
+                    {
+                        timeout: 5000
                     }
                 );
 
@@ -54,9 +69,12 @@ export default function AddWorkout(){
                     setWorkoutDay(response.data);
                 }
 
-            } catch (error) {
+            } catch (requestError) {
 
-                console.error("Failed to fetch workout day:", error);
+                console.error(
+                    "Failed to fetch workout day:",
+                    requestError
+                );
 
                 if (!ignore) {
                     setError(true);
@@ -93,16 +111,52 @@ export default function AddWorkout(){
 
                 <h2>Workout Summary</h2>
 
-                {loading && (
+                {!user || !user.email ? (
+                    <p>Please log in</p>
+                ) : !selectedDate ? (
+                    <p>Select a date</p>
+                ) : loading ? (
                     <p>Loading workout...</p>
-                )}
-
-                {!loading && error && (
-                    <p>Couldn't load this workout. Please check the server and try again.</p>
-                )}
-
-                {!loading && !error && workoutDay && !hasExercises && (
+                ) : error ? (
+                    <p>
+                        Couldn't load this workout. Please check the
+                        server and try again.
+                    </p>
+                ) : !hasExercises ? (
                     <p>No exercises logged for this day</p>
+                ) : (
+                    <div className="workout-exercises">
+
+                        {Object.entries(workoutDay.exercises).map(
+                            ([exercise, sets]) => (
+                                <div
+                                    className="workout-exercise"
+                                    key={exercise}
+                                >
+
+                                    <h3>{exercise}</h3>
+
+                                    <ul
+                                        style={{
+                                            listStyle: "none",
+                                            padding: 0,
+                                            margin: 0
+                                        }}
+                                    >
+                                        {sets.map((set, index) => (
+                                            <li
+                                                key={`${exercise}-${index}`}
+                                            >
+                                                Set {index + 1}: {set.reps} reps × {set.weight} kg
+                                            </li>
+                                        ))}
+                                    </ul>
+
+                                </div>
+                            )
+                        )}
+
+                    </div>
                 )}
 
             </div>
