@@ -3,7 +3,7 @@ import { useContext, useEffect, useState } from "react";
 import { UserContext } from "../../Context/UserContext";
 import axios from "axios";
 
-export default function AddWorkout(){
+export default function AddWorkout() {
 
     const { user } = useContext(UserContext);
 
@@ -25,6 +25,8 @@ export default function AddWorkout(){
     const [workoutDay, setWorkoutDay] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState(false);
 
     useEffect(() => {
 
@@ -46,7 +48,7 @@ export default function AddWorkout(){
 
         let ignore = false;
 
-        async function fetchWorkoutDay(){
+        async function fetchWorkoutDay() {
 
             setLoading(true);
             setError(false);
@@ -104,7 +106,100 @@ export default function AddWorkout(){
         workoutDay.exercises &&
         Object.keys(workoutDay.exercises).length > 0;
 
-    return(
+    async function handleSubmit(event) {
+
+        event.preventDefault();
+
+        setSaveError(false);
+
+        if (!user || !user.email) {
+            setSaveError(true);
+            return;
+        }
+
+        if (!selectedDate) {
+            setSaveError(true);
+            return;
+        }
+
+        if (!exerciseName.trim()) {
+            setSaveError(true);
+            return;
+        }
+
+        const repsNumber = Number(reps);
+        const weightNumber = Number(weight);
+
+        if (
+            !Number.isInteger(repsNumber) ||
+            repsNumber < 1 ||
+            !Number.isFinite(weightNumber) ||
+            weightNumber < 0
+        ) {
+            setSaveError(true);
+            return;
+        }
+
+        setSaving(true);
+
+        try {
+
+            await axios.post(
+                "http://localhost:8001/workouts/add_exercise",
+                {
+                    user_email: user.email,
+                    date: selectedDate,
+                    exercise_name: exerciseName.trim(),
+                    reps: repsNumber,
+                    weight: weightNumber
+                },
+                {
+                    timeout: 5000
+                }
+            );
+
+            setExerciseName("");
+            setReps("");
+            setWeight("");
+
+            // Refresh the Workout Summary.
+            // Changing the date would also trigger the effect,
+            // but we want to refresh the same selected date.
+            setWorkoutDay(null);
+            setLoading(true);
+            setError(false);
+
+            const response = await axios.post(
+                "http://localhost:8001/workouts/workout_day",
+                {
+                    user_email: user.email,
+                    date: selectedDate
+                },
+                {
+                    timeout: 5000
+                }
+            );
+
+            setWorkoutDay(response.data);
+            setLoading(false);
+
+        } catch (requestError) {
+
+            console.error(
+                "Failed to save workout:",
+                requestError
+            );
+
+            setSaveError(true);
+
+        } finally {
+
+            setSaving(false);
+
+        }
+    }
+
+    return (
         <div className="workout-tracker-wrapper">
 
             <div className="workout-summary-container">
@@ -161,7 +256,7 @@ export default function AddWorkout(){
 
             </div>
 
-            <form className="workout-form">
+            <form className="workout-form" onSubmit={handleSubmit}>
 
                 <h2>New Set</h2>
 
@@ -216,10 +311,15 @@ export default function AddWorkout(){
                     placeholder="e.g. 60"
                 />
 
-                <button type="submit">
-                    Add Set
+                <button type="submit" disabled={saving}>
+                    {saving ? "Saving..." : "Add Set"}
                 </button>
 
+                {saveError && (
+                    <p>
+                        Couldn't save this set. Please check your details and try again.
+                    </p>
+                )}
             </form>
 
         </div>
