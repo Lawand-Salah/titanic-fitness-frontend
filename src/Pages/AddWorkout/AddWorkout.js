@@ -263,6 +263,7 @@ export default function AddWorkout() {
                         setSelectedDate(event.target.value);
                         setSaveMessage("");
                     }}
+                    disabled={saving}
                 />
 
                 <label htmlFor="exercise-name">
@@ -278,6 +279,7 @@ export default function AddWorkout() {
                         setSaveMessage("");
                     }}
                     placeholder="e.g. Bench Press"
+                    disabled={saving}
                 />
 
                 <label htmlFor="reps">
@@ -295,6 +297,7 @@ export default function AddWorkout() {
                         setSaveMessage("");
                     }}
                     placeholder="e.g. 10"
+                    disabled={saving}
                 />
 
                 <label htmlFor="weight">
@@ -312,6 +315,7 @@ export default function AddWorkout() {
                         setSaveMessage("");
                     }}
                     placeholder="e.g. 60"
+                    disabled={saving}
                 />
 
                 <button type="submit" disabled={saving}>
