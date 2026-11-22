@@ -1,0 +1,89 @@
+.exercise-db-container {
+    width: 100%;
+    color: white;
+}
+
+.exercise-db-state {
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background-color: var(--background-color, #020913);
+    color: white;
+    text-align: center;
+}
+
+.exercise-db-error {
+    border-color: var(--primary-color, #C10000);
+}
+
+.exercise-db-count {
+    margin: 20px 0 12px;
+    color: white;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.exercise-db-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.exercise-db-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 110px;
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background-color: var(--navy-blue, #072034);
+    color: white;
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.exercise-db-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--primary-color, #C10000);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.exercise-db-name {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.exercise-db-category {
+    display: inline-block;
+    align-self: flex-start;
+    margin-top: 14px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background-color: var(--primary-color, #C10000);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+@media (max-width: 1000px) {
+    .exercise-db-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .exercise-db-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 500px) {
+    .exercise-db-grid {
+        grid-template-columns: 1fr;
+    }
+}
