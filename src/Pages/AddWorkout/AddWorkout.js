@@ -26,7 +26,8 @@ export default function AddWorkout() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [saveError, setSaveError] = useState(false);
+    const [saveMessage, setSaveMessage] = useState("");
+    const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
 
@@ -99,7 +100,7 @@ export default function AddWorkout() {
             ignore = true;
         };
 
-    }, [user, selectedDate]);
+    }, [user, selectedDate, refreshKey]);
 
     const hasExercises =
         workoutDay &&
@@ -110,33 +111,38 @@ export default function AddWorkout() {
 
         event.preventDefault();
 
-        setSaveError(false);
-
-        if (!user || !user.email) {
-            setSaveError(true);
-            return;
-        }
-
-        if (!selectedDate) {
-            setSaveError(true);
-            return;
-        }
+        setSaveMessage("");
 
         if (!exerciseName.trim()) {
-            setSaveError(true);
+            setSaveMessage("Exercise name is required.");
+            return;
+        }
+
+        if (!reps.trim()) {
+            setSaveMessage("Reps must be a whole number of at least 1.");
+            return;
+        }
+
+        if (!weight.trim()) {
+            setSaveMessage("Weight must be 0 or more.");
             return;
         }
 
         const repsNumber = Number(reps);
         const weightNumber = Number(weight);
 
-        if (
-            !Number.isInteger(repsNumber) ||
-            repsNumber < 1 ||
-            !Number.isFinite(weightNumber) ||
-            weightNumber < 0
-        ) {
-            setSaveError(true);
+        if (!Number.isInteger(repsNumber) || repsNumber < 1) {
+            setSaveMessage("Reps must be a whole number of at least 1.");
+            return;
+        }
+
+        if (!Number.isFinite(weightNumber) || weightNumber < 0) {
+            setSaveMessage("Weight must be 0 or more.");
+            return;
+        }
+
+        if (!user || !user.email || !selectedDate) {
+            setSaveMessage("Couldn't save this set. Please try again.");
             return;
         }
 
@@ -162,26 +168,9 @@ export default function AddWorkout() {
             setReps("");
             setWeight("");
 
-            // Refresh the Workout Summary.
-            // Changing the date would also trigger the effect,
-            // but we want to refresh the same selected date.
-            setWorkoutDay(null);
-            setLoading(true);
-            setError(false);
-
-            const response = await axios.post(
-                "http://localhost:8001/workouts/workout_day",
-                {
-                    user_email: user.email,
-                    date: selectedDate
-                },
-                {
-                    timeout: 5000
-                }
-            );
-
-            setWorkoutDay(response.data);
-            setLoading(false);
+            // Tell the existing useEffect to fetch the
+            // selected day's workout again.
+            setRefreshKey((currentKey) => currentKey + 1);
 
         } catch (requestError) {
 
@@ -190,7 +179,9 @@ export default function AddWorkout() {
                 requestError
             );
 
-            setSaveError(true);
+            setSaveMessage(
+                "Couldn't save this set. Please check the server and try again."
+            );
 
         } finally {
 
@@ -268,7 +259,11 @@ export default function AddWorkout() {
                     id="workout-date"
                     type="date"
                     value={selectedDate}
-                    onChange={(event) => setSelectedDate(event.target.value)}
+                    onChange={(event) => {
+                        setSelectedDate(event.target.value);
+                        setSaveMessage("");
+                    }}
+                    disabled={saving}
                 />
 
                 <label htmlFor="exercise-name">
@@ -279,8 +274,12 @@ export default function AddWorkout() {
                     id="exercise-name"
                     type="text"
                     value={exerciseName}
-                    onChange={(event) => setExerciseName(event.target.value)}
+                    onChange={(event) => {
+                        setExerciseName(event.target.value);
+                        setSaveMessage("");
+                    }}
                     placeholder="e.g. Bench Press"
+                    disabled={saving}
                 />
 
                 <label htmlFor="reps">
@@ -293,8 +292,12 @@ export default function AddWorkout() {
                     min="1"
                     step="1"
                     value={reps}
-                    onChange={(event) => setReps(event.target.value)}
+                    onChange={(event) => {
+                        setReps(event.target.value);
+                        setSaveMessage("");
+                    }}
                     placeholder="e.g. 10"
+                    disabled={saving}
                 />
 
                 <label htmlFor="weight">
@@ -307,18 +310,20 @@ export default function AddWorkout() {
                     min="0"
                     step="0.1"
                     value={weight}
-                    onChange={(event) => setWeight(event.target.value)}
+                    onChange={(event) => {
+                        setWeight(event.target.value);
+                        setSaveMessage("");
+                    }}
                     placeholder="e.g. 60"
+                    disabled={saving}
                 />
 
                 <button type="submit" disabled={saving}>
                     {saving ? "Saving..." : "Add Set"}
                 </button>
 
-                {saveError && (
-                    <p>
-                        Couldn't save this set. Please check your details and try again.
-                    </p>
+                {saveMessage && (
+                    <p>{saveMessage}</p>
                 )}
             </form>
 
