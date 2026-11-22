@@ -8,92 +8,108 @@ export default function ExerciseDb() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
 
-    const [exercisesCache, setExercisesCache] = useState({});
-
     const [exercise, setExercises] = useState([]);
 
-    function getExercises() {
-        setIsLoading(true);
-        setError("");
+    useEffect(() => {
+        const controller = new AbortController();
+        let isActive = true;
 
-        let api_endpoint =
-            "https://wger.de/api/v2/exerciseinfo/?language=2&limit=900";
+        async function getExercises() {
+            setIsLoading(true);
+            setError("");
 
-        if (filters > 0) {
-            api_endpoint += `&category=${filters}`;
-        }
+            const cacheKey = `exercise-db:v2:${filters}`;
 
-        let cached = null;
-
-        try {
-            cached = localStorage.getItem(api_endpoint);
-        } catch (storageError) {
-            console.log("Could not read exercise cache:", storageError);
-        }
-
-        if (cached) {
             try {
-                const parsedCache = JSON.parse(cached);
+                let cached = null;
 
-                if (Array.isArray(parsedCache)) {
-                    setExercises(parsedCache);
-                    setIsLoading(false);
-                    return;
+                try {
+                    cached = localStorage.getItem(cacheKey);
+                } catch (storageError) {
+                    // Cache failure should not prevent the API request.
                 }
 
-                console.log("Exercise cache is not an array.");
-            } catch (parseError) {
-                console.log("Invalid exercise cache:", parseError);
-            }
-        }
+                if (cached) {
+                    try {
+                        const parsedCache = JSON.parse(cached);
 
-        axios.get(api_endpoint)
-            .then((response) => {
-                console.log(response.data.results);
+                        if (Array.isArray(parsedCache)) {
+                            if (!isActive) {
+                                return;
+                            }
 
-                let foundExercises = [];
-
-                for (let exerciseMetadata of response.data.results) {
-                    const englishTranslation =
-                        exerciseMetadata.translations.find(
-                            (translation) => translation.language === 2
-                        );
-
-                    if (englishTranslation) {
-                        foundExercises.push({
-                            id: exerciseMetadata.id,
-                            name: englishTranslation.name,
-                            category: exerciseMetadata.category
-                        });
+                            setExercises(parsedCache);
+                            setIsLoading(false);
+                            return;
+                        }
+                    } catch (parseError) {
+                        // Invalid cache should be ignored and replaced by fresh data.
                     }
+                }
+
+                let nextUrl =
+                    "https://wger.de/api/v2/exerciseinfo/?language=2&limit=900";
+
+                if (filters > 0) {
+                    nextUrl += `&category=${filters}`;
+                }
+
+                const foundExercises = [];
+
+                while (nextUrl && isActive) {
+                    const response = await axios.get(nextUrl, {
+                        signal: controller.signal
+                    });
+
+                    for (const exerciseMetadata of response.data.results) {
+                        const englishTranslation =
+                            exerciseMetadata.translations.find(
+                                (translation) => translation.language === 2
+                            );
+
+                        if (englishTranslation) {
+                            foundExercises.push({
+                                id: exerciseMetadata.id,
+                                name: englishTranslation.name,
+                                category: exerciseMetadata.category
+                            });
+                        }
+                    }
+
+                    nextUrl = response.data.next;
+                }
+
+                if (!isActive) {
+                    return;
                 }
 
                 try {
                     localStorage.setItem(
-                        api_endpoint,
+                        cacheKey,
                         JSON.stringify(foundExercises)
                     );
                 } catch (storageError) {
-                    console.log(
-                        "Could not save exercise cache:",
-                        storageError
-                    );
+                    // Cache failure should not prevent the exercises from displaying.
                 }
 
                 setExercises(foundExercises);
                 setIsLoading(false);
+            } catch (requestError) {
+                if (!isActive || controller.signal.aborted) {
+                    return;
+                }
 
-                console.log(foundExercises);
-            })
-            .catch((error) => {
-                console.log(error);
                 setError("Couldn't load exercises. Please try again.");
                 setIsLoading(false);
-            });
-    }
+            }
+        }
 
-    useEffect(() => {
         getExercises();
+
+        return () => {
+            isActive = false;
+            controller.abort();
+        };
     }, [filters]);
 
     return (
